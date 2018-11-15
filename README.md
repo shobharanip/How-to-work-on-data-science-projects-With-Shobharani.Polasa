@@ -1,16 +1,17 @@
-# How to work on data science projects
+**How to work on data science projects **
 With Shobharani.Polasa
 
 We’ll discuss how to work on data science project given in the course in this guide with a basic example on a regression problem and a classification problem. Let’s start with a regression problem. I am not discussing problem details here in terms of what all variables explicitly mean, because; the purpose of this guide is to provide you with a process map to follow to work on the projects. This is an example here; follow a similar process to make a basic submission for any of the data science projects.
 Please note however, that basic submission, which you do using the process mentioned here will not guarantee a score which is higher than the required threshold in individual projects. At the end of the guide, I’ll also discuss how to improve on your submissions.
 
-# Regression problem
+**Regression problem**
 
 The problem here is to predict interest rate. You have been provided with train and test data separately, where test data doesn’t have response values. You need to use train data to build your model and use that model to make prediction on test data and upload the csv file to LMS.
 In this example we have been given ld_train as train data and ld_test as test data, Interest.Rate is our response variable which we need to make prediction model for.
 
-CODE:
+**EDA Process:**
 
+CODE:
 setwd("/Users/shobharani/Dropbox/March onwards/CBAP with R/Data/")
  you will need to use the location here for your own machine
  where ever you have put data in your machine
@@ -20,8 +21,9 @@ ld_test= read.csv("loan_data_test.csv",stringsAsFactors = F)
 You will need same set of “vars” on both train and test, it’s easier to manage that if you combine train and test in the beginning and then separate them once you are done with data prep.
 Before combining however, we’ll need some placeholder column which we can use to differentiate between observations coming from train and test data. Also we’ll need to add a column for response to test data so that we have same columns in both train and test. We’ll fill test’s response column with NAs.
 
-CODE:
+**Finding the Missing values:**
 
+CODE:
 ld_test$Interest.Rate=NA
 ld_train$data='train'
 ld_test$data='test'
@@ -29,15 +31,13 @@ ld_all=rbind(ld_train,ld_test)
 
 ld_all now has all our data, we’ll do data prep for the same . First thing to check will be, are there any variables which have come as characters but were supposed to be numbers. 
 
+**Data Preparation: **
 
 CODE:
-
 library(dplyr)
 glimpse(ld_all)
 
 OUTPUT: 
-
-
  Observations: 2,500
  Variables: 16
  $ ID <int> 79542, 75473, 67265, 80167, 172...
@@ -57,25 +57,21 @@ OUTPUT:
  $ Employment.Length <chr> "5 years", "4 years", "< 1 year...
  $ data <chr> "train", "train", "train", "tra...
 
-As you can see here, many vars have come as characters, but they should have been numbers. 
+**Character data preparation: **
 
+As you can see here, many vars have come as characters, but they should have been numbers. 
 For Example:
 Interest.Rate and Debt.To.Income.Ratio ratio have come as character because there is a % sign in the values.
 
 Lets get rid of that.
 
 CODE:
-
 ld_all=ld_all %>%
 mutate(Debt.To.Income.Ratio=gsub("%","",Debt.To.Income.Ratio),
 Interest.Rate=gsub("%","",Interest.Rate))
-
 There are many other vars which have come as character columns because of some odd values in the raw csv data. We can convert them to numeric by using function as.numeric . We’ll get the warnings for those odd values. Don’t worry about that.
-
 CODE:
-
 col_names=c('Debt.To.Income.Ratio','Interest.Rate','Amount.Requested','Amount.Funded.By.Investors', 'Open.CREDIT.Lines','Revolving.CREDIT.Balance')
-
 for(col in col_names){
 ld_all[,col]=as.numeric(ld_all[,col])
 }
@@ -88,8 +84,9 @@ OUTPUT:
 
 Next we’ll create dummy vars for any remaining categorical vars. I am providing a function which you can use to create dummy vars quickly. However this doesn’t merge categories, number of dummies created can be huge in certain cases. It also ignores categories which have very low frequencies in the data. Default frequency cutoff is 100, you can always change that.
 
-CODE:
+**Function for preparing data in easy way: **
 
+CODE:
 CreateDummies=function(data,var,freq_cutoff=100){
 t=table(data[,var])
 t=t[t>freq_cutoff]
@@ -112,10 +109,11 @@ data[,var]=NULL
 return(data)
 }
 
+**Another method for data preparation: **
+
 Instead of using these functions on columns one by one, we can use sapply to get all the col names which are of character type.
 
 CODE:
-
 char_logical=sapply(ld_all,is.character)
 cat_cols=names(ld_all)[char_logical]
 cat_cols
@@ -124,9 +122,7 @@ cat_cols
  [7] "data"
 
 Among these columns we don’t need to create dummies for column data and our response column.
-
 CODE:
-
 cat_cols=cat_cols[!(cat_cols %in% c('data','Interest.Rate'))]
 cat_cols
  [1] "Loan.Length" "Loan.Purpose" "State"
@@ -138,9 +134,7 @@ ld_all=CreateDummies(ld_all,col,50)
  lower cutoffs will simply result in more number of dummy vars
 }
 glimpse(ld_all)
-
 OUTPUT:
-
  Observations: 2,500
  Variables: 61
  $ ID <int> 79542, 75473, 67265, 80167, 17...
@@ -205,52 +199,47 @@ OUTPUT:
  $ Employment.Length_LT_1year <dbl> 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, ...
  $ Employment.Length_10years <dbl> 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, ...
 
+**Converting: **
 
 We could have avoided having too many dummy vars by converting FICO.Range and Employment.Length to numbers by some logic which wouldn’t change nature of information in columns.
 Now that all the columns are of numeric types we can go ahead and separate training and testing data.
-
 But before we need to check if there are any NA values. We can drop all the obs straight away where the response itself is NA in the train data.
 
 CODE:
 ld_all=ld_all[!((is.na(ld_all$Interest.Rate)) & ld_all$data=='train'), ]
-
 for other columns we can impute by means [ you can examine individual columns with NAs and impute with some other logical values as well , in case mean doesn’t makes sense in context]. We’ll of course ignore columns data and response for the same. Also only obs used for calculating mean should come from train data, so that there is no information leakage.
-
 CODE:
-
 for(col in names(ld_all)){
 if(sum(is.na(ld_all[,col]))>0 & !(col %in% c("data","Interest.Rate"))){
 ld_all[is.na(ld_all[,col]),col]=mean(ld_all[ld_all$data=='train',col],na.rm=T)
 }
 }
 
+**Removing unnecessary data: **
+
 Let’s separate our two data sets and remove the unnecessary columns that we added while combining them.
-
 CODE:
-
 ld_train=ld_all %>% filter(data=='train') %>% select(-data)
 ld_test=ld_all %>% filter(data=='test') %>% select(-data,-Interest.Rate)
 
 Let’s build a model on training data. I am not going to build any complex model, it’s up to you to use other algorithms.
 
-CODE:
+**Linear regression method: **
 
+CODE:
 for_vif=lm(Interest.Rate~.-ID,data=ld_train)
  I have excluded ID from the modeling process because it doesnt make sense to keep a serial number
  as predictor
-
 library(car)
 sort(vif(for_vif),decreasing = T)[1:3]
 
 OUTPUT:
-
  Amount.Requested Amount.Funded.By.Investors
  16.731657 16.301675
  Employment.Length_10years
  7.232373
 
 CODE:
-
 for_vif=lm(Interest.Rate~.-ID-Amount.Funded.By.Investors	data=ld_train)
 sort(vif(for_vif)	decreasing = T)[1:3]
 
@@ -261,22 +250,18 @@ OUTPUT:
  3.939294
 
 CODE:
-
 for_vif=lm(Interest.Rate~.-ID-Amount.Funded.By.Investors
 -Employment.Length_10years,data=ld_train)
 sort(vif(for_vif),decreasing = T)[1:3]
 
 OUTPUT:
-
  Home.Ownership_MORTGAGE Home.Ownership_RENT
  3.810620 3.704167
  Loan.Purpose_debt_consolidation
  2.788534
 
 now that we have taken out the vars which had redundant information, lets build our model.
-
 CODE:
-
 rm(for_vif)
 fit=lm(Interest.Rate~.-ID-Amount.Funded.By.Investors
 5
@@ -287,23 +272,17 @@ fit=step(fit)
 
 in case you are building a linear model, you can further look at output of summary(fit), and remove vars which have high p-values . I am skipping that step here.
 once you are done with your model building , now is the time to make prediction on test and submit
-
 CODE:
-
 test.predictions=predict(fit,newdata=ld_test)
 write.csv(test.predictions,'proper_name.csv',row.names = F)
  dont be lazy chose a proper name as instructed in the problem statement page
-
 this csv file is what you need to upload on LMS.
 
-Classification problem:
+**Classification problem: **
 
 In this we have been given data bd_train and bd_test and we are required to predict revenue.grid whether it takes value 1 or not.
 I will carry out usual data step for this as well. no need for repeat commentary on the same
-
-
 CODE:
-
 setwd("/Users/lalitsachan/Dropbox/March onwards/CBAP with R/Data/")
 bd_train=read.csv("bd_train.csv",stringsAsFactors = F)
 bd_test=read.csv("bd_test.csv",stringsAsFactors = F)
@@ -349,17 +328,14 @@ OUTPUT:
  $ Investment.in.Derivative <dbl> 95.52, 89.20, 3.50, 7.99, 15.6...
  $ Portfolio.Balance <dbl> 249.82, 222.27, 17.05, -72.74,...
  $ data <chr> "train", "train", "train", "tr...
-
 if you look at variables post_code and post_area, you will notice that they have more than 2000 unique values , having none of the individual values having frequency higher than a good number , we’ll drop those vars.
-
 CODE:
-
 bd_all=bd_all %>% select(-post_code,-post_area)
 
+** Creating dummies**
+
 We’ll create dummies for rest [although we could avoid lot of dummies by converting children, age_band and family_income to numbers]
-
 CODE:
-
 char_logical=sapply(bd_all,is.character)
 cat_cols=names(bd_all)[char_logical]
 cat_cols=cat_cols[!(cat_cols %in% c('data','Revenue.Grid'))]
@@ -373,7 +349,6 @@ cat_cols
  [11] "gender" "region"
 
 CODE:
-
 for(col in cat_cols){
 bd_all=CreateDummies(bd_all,col,500)
 }
@@ -386,29 +361,22 @@ bd_all[is.na(bd_all[,col]),col]=mean(bd_all[bd_all$data=='train',col],na.rm=T)
 bd_train=bd_all %>% filter(data=='train') %>% select(-data)
 bd_test=bd_all %>% filter(data=='test') %>% select(-data,-Revenue.Grid)
 
+**Remove redundant information**
+
 lets remove vars which have redundant information first on the basis of vif
 
 CODE:
-
 for_vif=lm(Revenue.Grid~.-REF_NO	data=bd_train)
 sort(vif(for_vif)	decreasing = T)[1:3]
-
  Investment.in.Commudity Investment.in.Derivative Investment.in.Equity
  245581506 211745544 154274335
-
-
 CODE:
-
 for_vif=lm(Revenue.Grid~.-REF_NO-Investment.in.Commudity,data=bd_train)
 sort(vif(for_vif),decreasing = T)[1:3]
-
-
 OUTPUT:
  Investment.in.Derivative Investment.in.Equity Personal.Loan
  211745470 154272444 53444347
-
 CODE:
-
 for_vif=lm(Revenue.Grid~.-REF_NO-Investment.in.Commudity
 -Investment.in.Derivative,data=bd_train)
 sort(vif(for_vif),decreasing = T)[1:3]
@@ -418,18 +386,15 @@ OUTPUT:
  152138342 34699149 30805247
 
 CODE:
-
 for_vif=lm(Revenue.Grid~.-REF_NO-Investment.in.Commudity
 -Investment.in.Derivative
 -Investment.in.Equity,data=bd_train)
 sort(vif(for_vif),decreasing = T)[1:3]
-
 OUTPUT:
  Portfolio.Balance TVarea_Carlton TVarea_Central
  13.239060 5.538360 5.388449
 
 CODE:
-
 for_vif=lm(Revenue.Grid~.-REF_NO-Investment.in.Commudity
 -Investment.in.Derivative
 -Investment.in.Equity
@@ -439,9 +404,7 @@ sort(vif(for_vif),decreasing = T)[1:3]
 OUTPUT:
  TVarea_Carlton TVarea_Central region_SouthEast
  5.538348 5.388446 5.048021
-
 CODE:
-
 bd_train$Revenue.Grid=as.numeric(bd_train$Revenue.Grid==1)
 fit=glm(Revenue.Grid~.-REF_NO-Investment.in.Commudity
 -Investment.in.Derivative
@@ -449,51 +412,40 @@ fit=glm(Revenue.Grid~.-REF_NO-Investment.in.Commudity
 -Portfolio.Balance, data=bd_train, family='binomial')
 
 OUTPUT:
-
  Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
-
 Don’t worry about the warning above. there will always be cases in the data for which it can be said full confidence what their outcome will be , that is what the warning means.
 I am skipping the step function and dropping vars here [ that doesn’t mean you don’t need to do that, you should if you are building a linear model]
 For making prediction, usually you will be required to submit probabilities in case of classification.
-
 CODE:
-
 test.probs=predict(fit,newdata=bd_test,type='response')
  different algos/functions will have different ways of extracting probabilities
  its mentioned in the project problem statement page as well
 write.csv(test.probs,'proper_name.csv',row.names = F)
-
 upload this csv file to LMS under that project submission tab.
-
 in case that particular project requires you to submit hard outcome instead of probabilities , first find a cutoff on the probability score as discussed in detail in the course. Lets say the cutoff that you have determined is 0.3.
-
 CODE:
-
 test.class=as.numeric(predict(fit,newdata=bd_test,type='response')>0.3)
 test.class=ifelse(test.class==1,'Yes','No')
 write.csv(test.class,'proper_name.csv',row.names = F)
 
-
-# Improving your score
+**Improving your score **
 
 • Try a nonlinear algorithm such as dtrees, rfs , extra trees or gbm , they almost always give better performance than a simple linear model.
 • Tune your parameters for above mentioned algos
 • Try stacking
 
-# How do I assess my model performance before submission?
+**How do I assess my model performance before submission? **
 
 You can break your given train data into two parts, build model on one check its performance on two, which will give you an idea about how your model might perform after submission. You cannot assess performance on given test data because response has been removed from it.
 
-# About the Author:
+**About the Author: **
 
 This is SHOBHARANI,
 An avid reader and blogger, who loves exploring the endless world of data science and artificial intelligence, Fascinated by the limitless applications of ML and AI; eager to learn and discover the depths of data science.
 
-# End Notes:
+**End Notes: **
 
 In this article we covered “How to work on data science projects” can be used to work on simple data science project. I consider this one of the most important articles. In real-life industry scenarios, you will quite often face the situation of having to explain the model’s results to the stakeholder (who is usually a non-technical person).
 Your chances of getting the model approved will lie in how well you are able to explain how and why the model is behaving the way it is. Plus it’s always a good idea to always explain any model’s performance to you in a way that a layman will understand – this is always a good practice!
 Hope this helps, feel free to suggest, you can connect with me in the comments section below if you have any questions or feedback on this article.
 And next part is coming soon so stay tuned!
-
-
